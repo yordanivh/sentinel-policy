@@ -1,0 +1,88 @@
+# This policy uses the Sentinel tfplan/v2 import to require that
+# specified GCP resources have all mandatory labels
+
+# Import common-functions/tfplan-functions/tfplan-functions.sentinel
+# with alias "plan"
+import "tfplan-functions" as plan
+import "tfstate-functions" as state
+
+# Import gcp-functions/gcp-functions.sentinel
+# with alias "gcp"
+import "gcp-functions" as gcp
+
+# List of GCP resources that are required to have name/value labels.
+param resource_types default [
+	"google_project",
+	"google_compute_instance",
+	"google_compute_instance_template",
+	"google_storage_bucket",
+	"google_kubernetes_cluster",
+	"google_alloydb_cluster",
+	"google_alloydb_backup",
+	"google_artifact_registry_repository",
+	"google_bigquery_dataset",
+	"google_bigquery_table",
+	"google_cloud_run_service",
+	"google_cloud_run_v2_job",
+	"google_compute_image",
+	"google_compute_disk",
+	"google_compute_snapshot",
+	"google_container_cluster",
+	"google_cloudfunctions_function",
+	"google_dataflow_job",
+	"google_vertex_ai_dataset",
+	"google_pubsub_subscription",
+	"google_cloudfunctions2_function",
+	# there is a BUG as reported here CEENG-1590 for this resource type and hence commenting it out for now until we find a perm fix 
+	# these are moved into enforce-mandatory-labels-workaround.sentinel
+	# "google_sql_database_instance", 
+	# "resource_database_migration_service_connection_profile",
+	# "resource_dataflow_job",
+	# "resource_data_pipeline_pipeline",
+	# "resource_monitoring_alert_policy",
+	# "resource_monitoring_custom_service",
+	# "resource_monitoring_notification_channel",
+	# "resource_monitoring_service",
+	# "resource_monitoring_slo",
+	# "resource_monitoring_uptime_check_config",
+	# "resource_sql_database_instance",
+	# This is commented out because if you use labels in the code, it transliterates it to effective_labels, but sentinel can't seem to find that
+	# See CEENG-1633 with Keith Wang
+	# "google_cloud_run_v2_service",
+]
+
+# List of mandatory labels
+# Policy ref: https://dnbenterprise.atlassian.net/wiki/spaces/ARP/pages/263258851/ADR-122+-+Enforce+enterprise-wide+tags+labels+aligned+to+CMDB+and+billing
+param mandatory_labels default [
+	"name",
+	"drn",
+	"dnb_environment",
+]
+
+# Get all GCP Resources with standard labels
+allGCPResourcesWithStandardLabels = gcp.find_resources_with_standard_labels(resource_types)
+
+allExistingGCPResourcesWithStandardLabels = gcp.find_existing_resources_with_standard_labels(resource_types)
+
+# Filter to GCP resources with violations using list of resources
+# Warnings will be printed for all violations since the last parameter is true
+violatingGCPResources = plan.filter_attribute_not_contains_list(allGCPResourcesWithStandardLabels,
+	"labels", mandatory_labels, true)
+
+violatingExistingGCPResources = state.filter_attribute_not_contains_list(allExistingGCPResourcesWithStandardLabels,
+	"labels", mandatory_labels, true)
+
+# Main rule
+main = rule {
+	length(violatingGCPResources["messages"]) is 0
+	# deprecate this to avoid deadlocking
+	# and length(violatingExistingGCPResources["messages"]) is 0
+}
+
+if main {
+	print("No resources missing labels have been found.")
+}
+
+if not main {
+	print("Please see https://mydnb.sharepoint.com/sites/ArchitectureEngineering/Lists/Policy%20Decisions/DispForm.aspx?ID=1")
+}
