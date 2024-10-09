@@ -67,10 +67,10 @@ allExistingGCPResourcesWithStandardLabels = gcp.find_existing_resources_with_sta
 # Filter to GCP resources with violations using list of resources
 # Warnings will be printed for all violations since the last parameter is true
 violatingGCPResources = plan.filter_attribute_not_contains_list(allGCPResourcesWithStandardLabels,
-	"labels", mandatory_labels, true)
+	"labels", mandatory_labels, false)
 
 violatingExistingGCPResources = state.filter_attribute_not_contains_list(allExistingGCPResourcesWithStandardLabels,
-	"labels", mandatory_labels, true)
+	"labels", mandatory_labels, false)
 
 # Main rule
 main = rule {
